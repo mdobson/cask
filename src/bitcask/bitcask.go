@@ -7,7 +7,7 @@ import "os"
 import "encoding/binary"
 import "bytes"
 
-const HEADER_SIZE = 4 + 4 + 4
+const HEADER_SIZE = 4 + 4 + 2 + 8 
 
 //Keydir value struct has necessary info for keydir lookups
 type keydirValue struct {
@@ -22,10 +22,10 @@ type keydirValue struct {
 type caskRecord struct {
 	crc int32
 	timestamp int32
-	ksz int
-	valueSz int
-	key string
-	value string
+	ksz int16
+	valueSz int64
+	key *bytes.Buffer
+	value *bytes.Buffer
 }
 
 //Main keydir object. This is what is primarily exported by the DB
@@ -42,8 +42,15 @@ func (c *caskRecord) Buffer() *bytes.Buffer {
 	_ = binary.Write(buf, binary.LittleEndian, c.timestamp)
 	_ = binary.Write(buf, binary.LittleEndian, c.ksz)
 	_ = binary.Write(buf, binary.LittleEndian, c.valueSz)
-	_ = binary.Write(buf, binary.LittleEndian, c.key)
-	_ = binary.Write(buf, binary.LittleEndian, c.value)
+	keyErr := binary.Write(buf, binary.LittleEndian, c.key.Bytes())
+	valueErr := binary.Write(buf, binary.LittleEndian, c.value.Bytes())
+	if keyErr != nil {
+		panic(keyErr)
+	}
+
+	if valueErr != nil {
+		panic(valueErr)
+	}
 	return buf
 
 }
@@ -79,14 +86,15 @@ func New() *Keydir {
 
 //Simple set function for now. Eventually it will take cask records and make them lovely bytes.
 func (k *Keydir) Set(key string, value string) {
-	offset := HEADER_SIZE + 4 + 4 + len(key) + k.currentDataOffset
+	record := &caskRecord{crc:1, timestamp:int32(time.Now().Unix()), ksz:int16(len(key)), valueSz:int64(len(value)), key:bytes.NewBufferString(key), value:bytes.NewBufferString(value)}
+	offset := HEADER_SIZE + record.key.Len() + k.currentDataOffset
 	k.dir[key] = keydirValue{fileId: k.dataFile.Name(), valueSz:len(value), valuePos:offset, timestamp:int32(time.Now().Unix())}
-	record := &caskRecord{crc:1, timestamp:int32(time.Now().Unix()), ksz:len(key), valueSz:len(value), key:key, value:value}
+	
 	
 	//Create binary buffer of the caskRecord object write that to file
 	buf := record.Buffer()
 	
-	print(len(buf.Bytes()))
+	
 	_, err := k.dataFile.Write(buf.Bytes())
 	k.currentDataOffset = offset
 	if err != nil {
@@ -97,6 +105,8 @@ func (k *Keydir) Set(key string, value string) {
 func (k *Keydir) Get(key string) string {
 	val := k.dir[key]
 	offset := int64(val.valuePos)
+	
+	//var value *bytes.Buffer
 	valSize := val.valueSz
 	buf := make([]byte, valSize)
 	_, err := k.dataFile.ReadAt(buf, offset)
