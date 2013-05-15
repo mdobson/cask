@@ -96,7 +96,7 @@ func (k *Keydir) Set(key string, value string) {
 	
 	
 	_, err := k.dataFile.Write(buf.Bytes())
-	k.currentDataOffset = offset
+	k.currentDataOffset = offset + record.value.Len()
 	if err != nil {
 		panic(err)
 	}
@@ -105,7 +105,7 @@ func (k *Keydir) Set(key string, value string) {
 func (k *Keydir) Get(key string) string {
 	val := k.dir[key]
 	offset := int64(val.valuePos)
-	
+	println(offset)
 	//var value *bytes.Buffer
 	valSize := val.valueSz
 	buf := make([]byte, valSize)
