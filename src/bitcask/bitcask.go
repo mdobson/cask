@@ -8,6 +8,7 @@ import "encoding/binary"
 import "bytes"
 
 const HEADER_SIZE = 4 + 4 + 2 + 8 
+const TOMBSTONE = "CASK.ENTOMBED"
 
 //Keydir value struct has necessary info for keydir lookups
 type keydirValue struct {
@@ -89,17 +90,14 @@ func (k *Keydir) Set(key string, value string) {
 	record := &caskRecord{crc:1, timestamp:int32(time.Now().Unix()), ksz:int16(len(key)), valueSz:int64(len(value)), key:bytes.NewBufferString(key), value:bytes.NewBufferString(value)}
 	offset := HEADER_SIZE + record.key.Len() + k.currentDataOffset
 	k.dir[key] = keydirValue{fileId: k.dataFile.Name(), valueSz:len(value), valuePos:offset, timestamp:int32(time.Now().Unix())}
-	
-	
 	//Create binary buffer of the caskRecord object write that to file
 	buf := record.Buffer()
-	
-	
 	_, err := k.dataFile.Write(buf.Bytes())
 	k.currentDataOffset = offset + record.value.Len()
 	if err != nil {
 		panic(err)
 	}
+	
 }
 
 func (k *Keydir) Get(key string) string {
@@ -114,5 +112,10 @@ func (k *Keydir) Get(key string) string {
 		panic(err)
 	}
 	return string(buf)
+}
+
+func (k *Keydir) Del(key string) {
+	k.Set(key, TOMBSTONE)
+	delete(k.dir, key)
 }
 
