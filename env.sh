@@ -1,1 +1,1 @@
-export GOPATH=$HOME/cask
+export GOPATH=`pwd`

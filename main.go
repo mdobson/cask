@@ -5,7 +5,7 @@ import "bitcask"
 func main() {
 	keyDir := bitcask.New()
 	keyDir.Set("Hello","World")
-	keyDir.Set("Hello","Are")
+	keyDir.Set("How","Are")
 	keyDir.Set("You","Doing")
 	val := keyDir.Get("Hello")
 	val2 := keyDir.Get("How")

@@ -7,7 +7,7 @@ import "os"
 import "encoding/binary"
 import "bytes"
 
-const HEADER_SIZE = 4 + 4 + 2 + 8 
+const HEADER_SIZE = 4 + 4 + 2 + 8
 const TOMBSTONE = "CASK.ENTOMBED"
 
 //Keydir value struct has necessary info for keydir lookups
@@ -59,7 +59,7 @@ func (c *caskRecord) Buffer() *bytes.Buffer {
 //Create a new Keydir initialize a new data file in the directory.
 //Probably will run compaction here too
 func New() *Keydir {
-	
+
 	var dataDirectory string = "data"
 
 	dir := make(map[string]keydirValue)
@@ -67,7 +67,7 @@ func New() *Keydir {
 	files, err := ioutil.ReadDir(dataDirectory)
 
 	if err != nil {
-		panic(err)
+		os.Mkdir("./data", 0777)
 	}
 
 	var fileNumber int = len(files)
@@ -97,7 +97,7 @@ func (k *Keydir) Set(key string, value string) {
 	if err != nil {
 		panic(err)
 	}
-	
+
 }
 
 func (k *Keydir) Get(key string) string {
@@ -118,4 +118,3 @@ func (k *Keydir) Del(key string) {
 	k.Set(key, TOMBSTONE)
 	delete(k.dir, key)
 }
-
