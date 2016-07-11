@@ -12,6 +12,7 @@ const TIMESTAMP_LENGTH = 4
 const KEY_SIZE_LENGTH = 2
 const VALUE_SIZE_LENGTH = 4
 const OFFSET = 4
+const TOTAL = CRC_LENGTH + TIMESTAMP_LENGTH + KEY_SIZE_LENGTH + VALUE_SIZE_LENGTH + OFFSET
 
 func main() {
 	// keyDir := bitcask.New()
@@ -43,13 +44,15 @@ func ReadFilesInDataDir() {
 	if err != nil {
 		panic(err)
 	}
+	var currentValueStartPos int = 0
 	for _, file := range files {
+		var hints []hintFileValue
 		byteArray, err := ioutil.ReadFile(path.Join(dir, file.Name()))
 		if err != nil {
 			panic(err)
 		}
 
-		buf := bytes.NewBuffer(byteArray)
+		buf := bytes.NewReader(byteArray)
 		for {
 			crcBuf := make([]byte, CRC_LENGTH)
 			tsBuf := make([]byte, TIMESTAMP_LENGTH)
@@ -66,7 +69,7 @@ func ReadFilesInDataDir() {
 			if err == io.EOF {
 				break
 			}
-			nTwo, _ := buf.Read(tsBuf)
+			buf.Read(tsBuf)
 			nThree, _ := buf.Read(kszBuf)
 			nFour, _ := buf.Read(vszBuf)
 
@@ -78,14 +81,18 @@ func ReadFilesInDataDir() {
 			println(len(kBuf))
 			vBuf := make([]byte, vsz)
 
+
 			nFive, _ := buf.Read(kBuf)
 			nSix, _ := buf.Read(vBuf)
-			println("--CRC--")
-			println(n)
-			println(binary.LittleEndian.Uint32(crcBuf))
-			println("--TS--")
-			println(nTwo)
-			println(binary.LittleEndian.Uint32(tsBuf))
+			//crc := binary.LittleEndian.Uint32(crcBuf)
+			ts := binary.LittleEndian.Uint32(tsBuf)
+			currentValueStartPos += TOTAL + int(ksz)
+			// println("--CRC--")
+			// println(n)
+			// println(crc)
+			// println("--TS--")
+			// println(nTwo)
+			// println(ts)
 			println("--KSZ--")
 			println(nThree)
 			println(int64(ksz))
@@ -98,6 +105,69 @@ func ReadFilesInDataDir() {
 			println("--VBUF--")
 			println(nSix)
 			println(string(vBuf))
+			println("--DATA POSITION--")
+			println(currentValueStartPos)
+			
+
+			hintFileVal := hintFileValue{
+				timestamp: int32(ts),
+				ksz: int16(ksz),
+				valueSz: int64(vsz),
+				valuePos: int32(currentValueStartPos),
+				key: bytes.NewBufferString(string(kBuf)),
+			}
+
+			hints = append(hints, hintFileVal)
+			currentValueStartPos += int(vsz)
+
+		}
+		testByteArray, testErr := ioutil.ReadFile(path.Join(dir, file.Name()))
+		if testErr != nil {
+			panic(err)
+		}
+		testBuf := bytes.NewReader(testByteArray)
+		for _, hintVal := range hints {
+			vBuf := make([]byte, hintVal.valueSz)
+			testBuf.ReadAt(vBuf, int64(hintVal.valuePos))
+			println("--SIZE--")
+			println(hintVal.valueSz)
+			println("--POS--")
+			println(hintVal.valuePos)
+			println("--HINTKEY--")
+			println(hintVal.key.String())
+			println("--HINTVAL--")
+			println(string(vBuf))
 		}
 	}
+}
+
+
+//Read data files
+//for latest keys generate hint file entries
+//Hint file format
+//timestamp
+//key size
+//value size
+//value position
+//key
+
+type hintFileValue struct {
+	timestamp int32
+	ksz int16
+	valueSz int64
+	valuePos int32
+	key *bytes.Buffer
+}
+
+type hintFile struct {
+	values []hintFileValue
+	fileId string
+}
+
+func CreateHintFile() {
+
+}
+
+func Compact() {
+
 }

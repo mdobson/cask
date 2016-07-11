@@ -13,6 +13,7 @@ const HEADER_TIMESTAMP_OFFSET = 4
 const HEADER_KEYSIZE_OFFSET = 12
 const HEADER_VALSIZE_OFFSET = 14
 const TOMBSTONE = "CASK.ENTOMBED"
+const DATA_DIRECTORY = "data"
 
 //Keydir value struct has necessary info for keydir lookups
 type keydirValue struct {
@@ -64,7 +65,7 @@ func (c *caskRecord) Buffer() *bytes.Buffer {
 //Probably will run compaction here too
 func New() *Keydir {
 
-	var dataDirectory string = "data"
+	var dataDirectory string = DATA_DIRECTORY
 
 	dir := make(map[string]keydirValue)
 
@@ -101,6 +102,11 @@ func (k *Keydir) Set(key string, value string) {
 	if err != nil {
 		panic(err)
 	}
+
+}
+
+//If there is a data directory pre-populate our keydir with that data
+func (k *Keydir) Load() {
 
 }
 
