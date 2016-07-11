@@ -8,6 +8,10 @@ import "encoding/binary"
 import "bytes"
 
 const HEADER_SIZE = 4 + 4 + 2 + 8
+const HEADER_CRC_OFFSET = 0
+const HEADER_TIMESTAMP_OFFSET = 4
+const HEADER_KEYSIZE_OFFSET = 12
+const HEADER_VALSIZE_OFFSET = 14
 const TOMBSTONE = "CASK.ENTOMBED"
 
 //Keydir value struct has necessary info for keydir lookups
