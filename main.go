@@ -6,6 +6,9 @@ import "io/ioutil"
 import "bytes"
 import "encoding/binary"
 import "path"
+import "strings"
+import "fmt"
+import "os"
 
 const CRC_LENGTH = 4
 const TIMESTAMP_LENGTH = 4
@@ -107,7 +110,7 @@ func ReadFilesInDataDir() {
 			println(string(vBuf))
 			println("--DATA POSITION--")
 			println(currentValueStartPos)
-			
+
 
 			hintFileVal := hintFileValue{
 				timestamp: int32(ts),
@@ -138,6 +141,13 @@ func ReadFilesInDataDir() {
 			println("--HINTVAL--")
 			println(string(vBuf))
 		}
+
+		hf := hintFile {
+			values: hints,
+			fileId: "foo",
+		}
+
+		CreateHintFile(hf)
 	}
 }
 
@@ -164,7 +174,40 @@ type hintFile struct {
 	fileId string
 }
 
-func CreateHintFile() {
+func WriteHintFileBuffer(h hintFileValue) *bytes.Buffer {
+	buf := new(bytes.Buffer)
+	_ = binary.Write(buf, binary.LittleEndian, h.timestamp)
+	_ = binary.Write(buf, binary.LittleEndian, h.ksz)
+	_ = binary.Write(buf, binary.LittleEndian, h.valueSz)
+	_ = binary.Write(buf, binary.LittleEndian, h.valuePos)
+	keyErr := binary.Write(buf, binary.LittleEndian, h.key.Bytes())
+	if keyErr != nil {
+		panic(keyErr)
+	}
+
+	return buf
+
+}
+
+func CreateHintFile(hf hintFile) {
+	dataDirectory := "./data"
+	files, _ := ioutil.ReadDir(dataDirectory)
+	var numberOfHintFiles int = 0;
+	for _, file := range files {
+		if strings.Contains(file.Name(), "hint") {
+			numberOfHintFiles+=1
+		}
+	}
+
+	var fileName string = fmt.Sprintf("%s/hint.%d.hfile", dataDirectory, numberOfHintFiles)
+
+	file, _ := os.Create(fileName)
+
+	for _, hint := range hf.values {
+		buf := WriteHintFileBuffer(hint)
+		file.Write(buf.Bytes())
+	}
+
 
 }
 
