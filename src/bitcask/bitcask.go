@@ -110,6 +110,18 @@ func (k *Keydir) Load() {
 
 }
 
+func (k *KeyDir) Merge() {
+	//Take total file count
+	//Look at curent file being written to
+	//Take all files before that
+	//for each file
+	//Read contents -> Get latest key value
+	//Create new merged file with value
+	//Create new hint file with value
+	//Merge latest keys together
+	//Spit out merged file and hint file
+}
+
 func (k *Keydir) Get(key string) string {
 	val := k.dir[key]
 	offset := int64(val.valuePos)
