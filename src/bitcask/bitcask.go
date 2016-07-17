@@ -75,7 +75,12 @@ func New() *Keydir {
 		os.Mkdir("./data", 0777)
 	}
 
-	var fileNumber int = len(files)
+	var fileNumber int = 0
+	for _, file := range files {
+		if strings.Contains(file.Name(), "data") {
+			fileNumber+=1
+		}
+	}
 
 	var fileName string = fmt.Sprintf("%s/data.%d.dfile", dataDirectory, fileNumber)
 
