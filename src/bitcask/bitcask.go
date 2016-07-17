@@ -2,10 +2,13 @@ package bitcask
 
 import "time"
 import "io/ioutil"
+import "io"
 import "fmt"
 import "os"
 import "encoding/binary"
 import "bytes"
+import "strings"
+import "path"
 
 const HEADER_SIZE = 4 + 4 + 2 + 8
 const HEADER_CRC_OFFSET = 0
@@ -75,9 +78,11 @@ func New() *Keydir {
 		os.Mkdir("./data", 0777)
 	}
 
+	var filesToRead []string = []string{}
 	var fileNumber int = 0
 	for _, file := range files {
 		if strings.Contains(file.Name(), "data") {
+			filesToRead = append(filesToRead, path.Join(dataDirectory, file.Name()))
 			fileNumber+=1
 		}
 	}
@@ -91,7 +96,9 @@ func New() *Keydir {
 	}
 
 	k := &Keydir{dir:dir, dataFileDirectory:dataDirectory, dataFile:file, currentDataOffset:0}
-
+	for _, file := range filesToRead {
+		k.Load(file)
+	}
 	return k
 }
 
@@ -111,11 +118,60 @@ func (k *Keydir) Set(key string, value string) {
 }
 
 //If there is a data directory pre-populate our keydir with that data
-func (k *Keydir) Load() {
+func (k *Keydir) Load(p string) {
+	fmt.Printf("Reading file: %s\n", p)
+	var currentValueStartPos int = 0
+	byteArray, err := ioutil.ReadFile(p)
+	if err != nil {
+		panic(err)
+	}
 
+	buf := bytes.NewReader(byteArray)
+	for {
+		crcBuf := make([]byte, 4)
+		tsBuf := make([]byte, 4)
+		kszBuf := make([]byte, 2)
+		vszBuf := make([]byte, 4)
+
+
+
+		n, err := buf.Read(crcBuf)
+		if n != 4 {
+			break
+		}
+
+		if err == io.EOF {
+			break
+		}
+		//Read timestamp
+		buf.Read(tsBuf)
+		//Read key size
+		buf.Read(kszBuf)
+		//Read value size
+		buf.Read(vszBuf)
+
+		ksz := binary.LittleEndian.Uint16(kszBuf)
+		vsz := binary.LittleEndian.Uint32(vszBuf)
+
+		kBuf := make([]byte, ksz + 4)
+		vBuf := make([]byte, vsz)
+
+
+		buf.Read(kBuf)
+		buf.Read(vBuf)
+		crc := binary.LittleEndian.Uint32(crcBuf)
+		ts := binary.LittleEndian.Uint32(tsBuf)
+		currentValueStartPos += 18 + int(ksz)
+		fmt.Printf("RECORD: CRC: %d TS: %d KSZ: %d VSZ: %d KEY: %s VAL: %s\n", crc, ts, ksz, vsz, string(kBuf), string(vBuf))
+
+		k.dir[string(kBuf)] = keydirValue{fileId: p, valueSz:len(vBuf), valuePos:currentValueStartPos, timestamp:int32(time.Now().Unix())}
+
+		currentValueStartPos += int(vsz)
+
+	}
 }
 
-func (k *KeyDir) Merge() {
+func (k *Keydir) Merge() {
 	//Take total file count
 	//Look at curent file being written to
 	//Take all files before that
@@ -127,18 +183,22 @@ func (k *KeyDir) Merge() {
 	//Spit out merged file and hint file
 }
 
-func (k *Keydir) Get(key string) string {
-	val := k.dir[key]
-	offset := int64(val.valuePos)
-	println(offset)
-	//var value *bytes.Buffer
-	valSize := val.valueSz
-	buf := make([]byte, valSize)
-	_, err := k.dataFile.ReadAt(buf, offset)
-	if err != nil {
-		panic(err)
+func (k *Keydir) Get(key string) (string, bool)  {
+	val, ok := k.dir[key]
+	if ok {
+		offset := int64(val.valuePos)
+		//println(offset)
+		//var value *bytes.Buffer
+		valSize := val.valueSz
+		buf := make([]byte, valSize)
+		_, err := k.dataFile.ReadAt(buf, offset)
+		if err != nil {
+			panic(err)
+		}
+		return string(buf), true
+	} else {
+		return "", false
 	}
-	return string(buf)
 }
 
 func (k *Keydir) Del(key string) {
