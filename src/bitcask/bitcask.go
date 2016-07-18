@@ -153,18 +153,31 @@ func (k *Keydir) Load(p string) {
 		ksz := binary.LittleEndian.Uint16(kszBuf)
 		vsz := binary.LittleEndian.Uint32(vszBuf)
 
-		kBuf := make([]byte, ksz + 4)
+		bareBuf := make([]byte, 4)
+		kBuf := make([]byte, ksz)
 		vBuf := make([]byte, vsz)
 
-
+		buf.Read(bareBuf)
 		buf.Read(kBuf)
 		buf.Read(vBuf)
-		crc := binary.LittleEndian.Uint32(crcBuf)
+		//crc := binary.LittleEndian.Uint32(crcBuf)
 		ts := binary.LittleEndian.Uint32(tsBuf)
 		currentValueStartPos += 18 + int(ksz)
-		fmt.Printf("RECORD: CRC: %d TS: %d KSZ: %d VSZ: %d KEY: %s VAL: %s\n", crc, ts, ksz, vsz, string(kBuf), string(vBuf))
 
-		k.dir[string(kBuf)] = keydirValue{fileId: p, valueSz:len(vBuf), valuePos:currentValueStartPos, timestamp:int32(time.Now().Unix())}
+
+		//fmt.Printf("RECORD: CRC: %d TS: %d KSZ: %d VSZ: %d KEY: %s VAL: %s\n", crc, ts, ksz, vsz, string(kBuf), string(vBuf))
+
+		if !strings.Contains(string(vBuf), TOMBSTONE) {
+			fmt.Printf("Key: %s %q\n\n", kBuf, kBuf)
+			fmt.Printf("Adding non tombstone to keydir: %s %q \n\n", string(vBuf), vBuf)
+			k.dir[string(kBuf)] = keydirValue{fileId: p, valueSz:len(vBuf), valuePos:currentValueStartPos, timestamp:int32(ts)}
+		} else {
+			_, ok := k.dir[string(kBuf)]
+			if ok {
+				delete(k.dir, string(kBuf))
+			}
+		}
+
 
 		currentValueStartPos += int(vsz)
 
@@ -191,10 +204,28 @@ func (k *Keydir) Get(key string) (string, bool)  {
 		//var value *bytes.Buffer
 		valSize := val.valueSz
 		buf := make([]byte, valSize)
-		_, err := k.dataFile.ReadAt(buf, offset)
-		if err != nil {
-			panic(err)
+		if strings.Contains(k.dataFile.Name(), val.fileId) {
+			fmt.Printf("Reading latest opened file.")
+			_, err := k.dataFile.ReadAt(buf, offset)
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			fmt.Printf("Reading new file:%s.", val.fileId)
+			file, err := os.Open(val.fileId)
+			if err != nil {
+				panic(err)
+			}
+			_, fileErr := file.ReadAt(buf, offset)
+			if fileErr != nil {
+				panic(fileErr)
+			}
+			fileCloseErr := file.Close()
+			if fileCloseErr != nil {
+				panic(fileCloseErr)
+			}
 		}
+
 		return string(buf), true
 	} else {
 		return "", false
